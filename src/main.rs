@@ -23,9 +23,10 @@ fn main() {
    //    // }
    // }
 
-   let a = "§";
-   let b = &a[0..1];
-   println!("{b}");
+   let a = "\"\\u{1F445}\\123\\x3A\\z \nb\\\"c\\\'§\\\\\"";
+   let mut b = Lexer::new(a);
+   b.lex_to_end();
+   dbg!(b);
 
    // let mut a = Lexer::new("[=[ abc\nabc]=]");
    // a.lex_to_end();
