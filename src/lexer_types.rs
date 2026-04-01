@@ -1,6 +1,7 @@
 use std::str::from_utf8;
-
 // https://www.lua.org/manual/5.3/manual.html
+
+
 #[derive(Debug, PartialEq)]
 pub enum TokenKind<'i> {
     Keyword(Keyword),
@@ -8,6 +9,62 @@ pub enum TokenKind<'i> {
     LiteralString(LiteralString<'i>),
     NumericConstant(NumericConstant),
     Identifier,
+}
+impl<'i> TokenKind<'i> {
+    pub fn get_keyword(&self) -> Option<&Keyword> {
+        match self {
+            TokenKind::Keyword(k) => Some(k),
+            _ => None
+        }
+    }
+    pub fn get_symbol(&self) -> Option<&Symbol> {
+        match self {
+            TokenKind::Symbol(s) => Some(s),
+            _ => None
+        }
+    }
+    pub fn get_literal_string(&self) -> Option<&LiteralString> {
+        match self {
+            TokenKind::LiteralString(ls) => Some(ls),
+            _ => None
+        }
+    }
+    pub fn get_numeric_constant(&self) -> Option<&NumericConstant> {
+        match self {
+            TokenKind::NumericConstant(nc) => Some(nc),
+            _ => None
+        }
+    }
+    pub fn unwrap_keyword(&self) -> &Keyword {
+        match self {
+            TokenKind::Keyword(k) => k,
+            _ => panic!("Incorrect tokenkind! Actual value: {:?}",self)
+        }
+    }
+    pub fn unwrap_symbol(&self) -> &Symbol {
+        match self {
+            TokenKind::Symbol(s) => s,
+            _ => panic!("Incorrect tokenkind! Actual value: {:?}",self)
+        }
+    }
+    pub fn unwrap_literal_string(&self) -> &LiteralString {
+        match self {
+            TokenKind::LiteralString(ls) => ls,
+            _ => panic!("Incorrect tokenkind! Actual value: {:?}",self)
+        }
+    }
+    pub fn unwrap_numeric_constant(&self) -> &NumericConstant {
+        match self {
+            TokenKind::NumericConstant(nc) => nc,
+            _ => panic!("Incorrect tokenkind! Actual value: {:?}",self)
+        }
+    }
+    pub fn is_identifier(&self) -> bool {
+        match self {
+            TokenKind::Identifier => false,
+            _ => true
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -156,19 +213,142 @@ pub enum LiteralString<'i> {
     UnescapedShort(&'i str),
 }
 impl<'i> LiteralString<'i> {
-    pub fn escape(self) -> Self {
+    pub fn is_escaped(&self) -> bool {
         match self {
-            Self::Escaped(_) => self,
+            Self::Escaped(_) => true,
+            _ => false,
+        }
+    }
+    pub fn escape(&self) -> Self {
+        match self {
             Self::UnescapedShort(s) => LiteralString::escape_short(s),
             Self::UnescapedLong(s) => LiteralString::escape_long(s),
+            Self::Escaped(_) => panic!("This LiteralString is already escaped!"),
         }
     }
     fn escape_short(s: &'i str) -> Self {
-        
-    }
-    }
-    fn escape_long(s: &'i str) -> Self {
+        let s = s.as_bytes();
+        let mut escaped = Vec::from(s);
+        while !s.is_empty() {
+            let Some(backslash_pos) = s.iter().position(|&v| dbg!(dbg!(v)==b'\\')) else {
+                println!("Failed to find another escape!");
+                break;
+            };
 
+            // A short literal string can be delimited by matching single or double quotes, and can contain the following C-like escape sequences: '\a' (bell), '\b' (backspace), '\f' (form feed), '\n' (newline), '\r' (carriage return), '\t' (horizontal tab), '\v' (vertical tab), '\\' (backslash), '\"' (quotation mark [double quote]), and '\'' (apostrophe [single quote]). A backslash followed by a line break results in a newline in the string.
+            let simple_escape = match dbg!(s[backslash_pos+1]) {
+                b'a'        => Some(b'\x07'),
+                b'b'        => Some(b'\x08'),
+                b'f'        => Some(b'\x0C'),
+                b'n'        => Some(b'\x0A'), //lua 5.3 manual says newline, but see https://www.lua.org/source/5.3/llex.c.html `read_string`, just \n in c code, which is line feed
+                b'r'        => Some(b'\x0D'),
+                b't'        => Some(b'\x09'),
+                b'v'        => Some(b'\x0B'),
+                b'\\'       => Some(b'\\'),
+                b'\"'       => Some(b'\"'),
+                b'\''       => Some(b'\''),
+                b'\n'       => Some(b'\n'), //ouhh platform dependent? unsure if this will work
+                _ => None,
+            };
+            if let Some(c) = simple_escape {
+                let to_replace = Vec::from(&escaped[backslash_pos..=backslash_pos+1]);
+                // dbg!(&escaped);
+                let r = escaped.remove(backslash_pos);
+                assert_eq!(b'\\', r);
+                escaped[backslash_pos] = c;
+                // dbg!(&escaped);
+                println!("Simple escape - replaced `{:?}` with `{}`",&to_replace,c);
+                continue;
+            }
+            
+            // The escape sequence '\z' skips the following span of white-space characters, including line breaks; it is particularly useful to break and indent a long literal string into multiple lines without adding the newlines and spaces into the string contents. A short literal string cannot contain unescaped line breaks nor escapes not forming a valid escape sequence.
+            if b'z' == s[backslash_pos+1] {
+                let start = backslash_pos+2;
+                let mut amount = 0;
+                while dbg!(escaped[start+amount]).is_ascii_whitespace() { // this might be problematic,, unicode whitespace? uuuoh..
+                    amount += 1;
+                }
+                let drained = escaped.drain(start-2..start+amount).collect::<Vec<u8>>();
+                println!("\\z escape - stripped `{:?}`",drained);
+                continue;
+            }
+
+            // We can specify any byte in a short literal string by its numeric value (including embedded zeros). This can be done with the escape sequence \xXX, where XX is a sequence of exactly two hexadecimal digits, or with the escape sequence \ddd, where ddd is a sequence of up to three decimal digits. (Note that if a decimal escape sequence is to be followed by a digit, it must be expressed using exactly three digits.) 
+            if b'x' == s[backslash_pos+1] {
+                if ! &s[backslash_pos+2..backslash_pos+4].iter().all(|v| v.is_ascii_hexdigit()) {
+                    panic!("Invalid \\x escape sequence ! `{:?}`",&s[backslash_pos+2..backslash_pos+4]);
+                }
+                
+                let v = str::from_utf8(&s[backslash_pos+2..backslash_pos+4]).expect("already checked in hexadecimal range");
+                let v = u8::from_str_radix(v, 16).expect("already checked in hexadecimal range");
+
+                let replaced = escaped.splice(backslash_pos+2..backslash_pos+4, [v]).collect::<Vec<u8>>();
+                println!("\\x escape - replaced `{:?}` with `{:?}`",replaced,[v]);
+                continue;
+            }
+            if s[backslash_pos+1].is_ascii_digit() {
+                let mut digits = 1;
+                if s[backslash_pos+2].is_ascii_digit() {
+                    digits += 1;
+                }
+                if s[backslash_pos+3].is_ascii_digit() {
+                    digits += 1;
+                }
+                
+                let v = str::from_utf8(&s[backslash_pos+1..backslash_pos+1+digits]).expect("already know are digits");
+                let v = u8::from_str_radix(v, 10).expect("already know are digits");
+
+                let replaced = escaped.splice(backslash_pos+1..backslash_pos+1+digits, [v]).collect::<Vec<u8>>();
+                println!("digit escape - replaced `{:?}` with `{:?}`",replaced,[v]);
+                continue;
+            }
+
+            // "The UTF-8 encoding of a Unicode character can be inserted in a literal string with the escape sequence \u{XXX} (note the mandatory enclosing brackets), where XXX is a sequence of one or more hexadecimal digits representing the character code point."
+            //
+            // lua 5.3 seems to allow arbitrary amount of leading 0s in this escape sequence, I assume `from_str_radix` treats it that way too.
+            //
+            // I'm reasonably sure the limit is 0x10FFFF, not 0x7FFFFFFF in 5.3. I won't test it in 5.3, it's just what I gather from the lua source code and testing in 5.4.
+            // see:   readutf8esc   https://www.lua.org/source/5.3/llex.c.html   https://www.lua.org/source/5.4/llex.c.html
+            if b'u' == s[backslash_pos+1] {
+                if s[backslash_pos+2] != b'{' {
+                    panic!("Invalid \\u escape sequence ! no opening {{");
+                }
+
+                let mut d = 1;
+                while s[backslash_pos+2+d].is_ascii_hexdigit() {
+                    d += 1;
+                }
+                if d == 1 {
+                    panic!("Invalid \\u escape sequence ! no hexdigits found!");
+                }
+                if dbg!(s[backslash_pos+2+d]) != b'}' {
+                    panic!("Invalid \\u escape sequence ! no closing }} immediately after hexdigits");
+                }
+
+                let v = str::from_utf8(&s[backslash_pos+3..backslash_pos+2+d]).expect("already checked in hexadecimal range");
+                let v = u32::from_str_radix(v, 16).expect("already checked in hexadecimal range");
+                if v > 0x10FFFF {
+                    panic!("Invalid \\u escape sequence ! beyond lua 5.3 0x10FFFF limit!");
+                }
+                let v = char::from_u32(v).expect("checked should be in utf8 0 to 0x10FFFF inclusive range");
+                // 
+                let mut h = [0u8;4];
+                let _ = v.encode_utf8(&mut h).as_bytes();
+                let r =  &h[0..v.len_utf8()];
+                
+                dbg!(r);
+                let replaced = escaped.splice(backslash_pos..backslash_pos+3+d, r.iter().cloned()).collect::<Vec<u8>>();
+                println!("\\u escape - replaced `{:?}` with `{:?}`",replaced,r);
+                let a = from_utf8(r).unwrap();
+                println!("{a}");
+                continue;
+            }
+        }
+
+        LiteralString::Escaped(String::from_utf8(escaped).expect("somehow fucked up the utf8"))
+    }
+    fn escape_long(s: &'i str   ) -> Self {
+        todo!();
     }
 }
 
@@ -329,9 +509,7 @@ impl<'i> Lexer<'i> {
         let contents = str::from_utf8(raw_inner_contents).expect("something dealing with bytes shat itself above");
 
         let span = &self.view[..contents.len()+2];
-        let contents_tokenkind = TokenKind::LiteralString(
-            LiteralString::Unescaped(
-                StringContents::Short(contents)));
+        let contents_tokenkind = TokenKind::LiteralString(LiteralString::UnescapedShort(contents));
 
         self.view = &self.view[span.len()..];
         Some(Token::new(contents_tokenkind, Span(span)))
@@ -390,7 +568,7 @@ impl<'i> Lexer<'i> {
         let inner_content = &span_without_opening[..span_without_opening.len()-end_len];
 
         self.view = &self.view[span.len()..];
-        Some(Token::new(TokenKind::LiteralString(LiteralString::Unescaped(StringContents::Short(inner_content))), Span(span)))
+        Some(Token::new(TokenKind::LiteralString(LiteralString::UnescapedLong(inner_content)), Span(span)))
     }
     // pub fn lex_long_literal_string(&mut self) -> Option<Token<'i>> {
     //     // looking at bytes is ok here because we look for '[', ']', '=', which are all ascii and-

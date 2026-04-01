@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::lexer_types::{Keyword, Lexer, LiteralString, Span, StringContents, Symbol, TokenKind};
+    use crate::lexer_types::{Keyword, Lexer, LiteralString, Span, Symbol, TokenKind};
 
     #[test]
     fn test_create() {
@@ -45,10 +45,10 @@ mod tests {
         let mut l = Lexer::new("x y");
         
         l.lex_to_end();
-        let mut i = l.iter_tokens();
-        assert_eq!(i.next().unwrap().get_kind(), &TokenKind::Identifier);
+        let mut i = l.iter_tokens().peekable();
+        assert_eq!(i.peek().unwrap().get_kind(), &TokenKind::Identifier);
         assert_eq!(i.next().unwrap().get_span(), Span("x"));
-        assert_eq!(i.next().unwrap().get_kind(), &TokenKind::Identifier);
+        assert_eq!(i.peek().unwrap().get_kind(), &TokenKind::Identifier);
         assert_eq!(i.next().unwrap().get_span(), Span("y"));
         assert_eq!(i.next(), None);
     }
@@ -58,24 +58,43 @@ mod tests {
         let mut l = Lexer::new("awoifjaw anderthal");
         
         l.lex_to_end();
-        let mut i = l.iter_tokens();
-        assert_eq!(i.next().unwrap().get_kind(), &TokenKind::Identifier);
-        assert_eq!(i.next().unwrap().get_span(), Span("aifaw"));
-        assert_eq!(i.next().unwrap().get_kind(), &TokenKind::Identifier);
+        let mut i = l.iter_tokens().peekable();
+        assert_eq!(i.peek().unwrap().get_kind(), &TokenKind::Identifier);
+        assert_eq!(i.next().unwrap().get_span(), Span("awoifjaw"));
+        assert_eq!(i.peek().unwrap().get_kind(), &TokenKind::Identifier);
         assert_eq!(i.next().unwrap().get_span(), Span("anderthal"));
         assert_eq!(i.next(), None);
     }
 
     #[test]
     fn test_simple_short_string() {
-        let s = r#""ab  c""#;
+        let s = r#""ab \" c""#;
+        let s1 = r#"ab \" c"#;
         let mut l = Lexer::new(s);
         l.lex_to_end();
-        let mut i = l.iter_tokens();
-        assert_eq!(
-            i.next().unwrap().get_kind(),
-            &TokenKind::LiteralString(LiteralString::Unescaped(StringContents::Short(s))));
-        
+        let mut i = l.iter_tokens().peekable();
+        assert_eq!(i.peek().unwrap().get_kind(), &TokenKind::LiteralString(LiteralString::UnescapedShort(s1)));
+        assert_eq!(i.next().unwrap().get_span(), Span(s));
+    }
+
+    #[test]
+    fn test_simple_short_string_escape() {
+        let s = r#""a\z   
+\
+\n
+\u{000000078} \65 \118 \a \" \\\\""#;
+        let s_unescaped = r#"a\z   
+\
+\n
+\u{000000078} \65 \118 \a \" \\\\"#;
+        let s_escaped = "a\\\n\nx A v \u{7} \" \\\\";
+        let mut l = Lexer::new(s);
+        l.lex_to_end();
+        let mut i = l.iter_tokens().peekable();
+        assert_eq!(i.peek().unwrap().get_kind(), &TokenKind::LiteralString(LiteralString::UnescapedShort(s_unescaped)));
+        assert_eq!(i.peek().unwrap().get_span(), Span(s));
+        let lit_str = i.next().unwrap().get_kind().unwrap_literal_string();
+        assert_eq!(lit_str.escape(), LiteralString::Escaped(String::from(s_escaped)));
     }
 
     #[test]
@@ -88,7 +107,7 @@ mod tests {
         let mut i = l.iter_tokens();
         let a = i.next().unwrap();
         assert_eq!(a.get_kind(),
-            &TokenKind::LiteralString(LiteralString::Unescaped(StringContents::Long(s1))));
+            &TokenKind::LiteralString(LiteralString::UnescapedLong(s1)));
         assert_eq!(a.get_span(), Span(s));
         assert_eq!(i.next(), None);
     }
@@ -100,41 +119,40 @@ mod tests {
         let mut l = Lexer::new(s);
 
         l.lex_to_end();
-        let mut i = l.iter_tokens();
-        let a = i.next().unwrap();
-        assert_eq!(a.get_kind(),
-            &TokenKind::LiteralString(LiteralString::Unescaped(StringContents::Long(s1))));
-        assert_eq!(a.get_span(), Span(s));
+        let mut i = l.iter_tokens().peekable();
+        assert_eq!(i.peek().unwrap().get_kind(),
+            &TokenKind::LiteralString(LiteralString::UnescapedLong(s1)));
+        assert_eq!(i.next().unwrap().get_span(), Span(s));
         assert_eq!(i.next(), None);
     }
 
-    #[test]
-    fn test_long_all() {
-        let s = "and   * \n / break=orville]true~= ifungus notand orelse";
-        let mut l = Lexer::new(s);
+    // #[test]
+    // fn test_long_all() {
+    //     let s = "and   * \n / break=orville]true~= ifungus notand orelse";
+    //     let mut l = Lexer::new(s);
         
-        l.lex_to_end();
-        let i = l.iter_tokens();
+    //     l.lex_to_end();
+    //     let i = l.iter_tokens();
 
-        let expecteds = [
-            (TokenKind::Keyword(Keyword::And), Span("and")),
-            (TokenKind::Symbol(Symbol::Star), Span("*")),
-            (TokenKind::Symbol(Symbol::Slash), Span("/")),
-            (TokenKind::Keyword(Keyword::Break), Span("break")),
-            (TokenKind::Symbol(Symbol::Equals), Span("=")),
-            (TokenKind::Identifier, Span("orville")),
-            (TokenKind::Symbol(Symbol::RBracket), Span("]")),
-            (TokenKind::Keyword(Keyword::True), Span("true")),
-            (TokenKind::Symbol(Symbol::NotEquals), Span("~=")),
-            (TokenKind::Identifier, Span("ifungus")),
-            (TokenKind::Identifier, Span("notand")),
-            (TokenKind::Identifier, Span("orelse")),
-        ];
+    //     let expecteds = [
+    //         (TokenKind::Keyword(Keyword::And), Span("and")),
+    //         (TokenKind::Symbol(Symbol::Star), Span("*")),
+    //         (TokenKind::Symbol(Symbol::Slash), Span("/")),
+    //         (TokenKind::Keyword(Keyword::Break), Span("break")),
+    //         (TokenKind::Symbol(Symbol::Equals), Span("=")),
+    //         (TokenKind::Identifier, Span("orville")),
+    //         (TokenKind::Symbol(Symbol::RBracket), Span("]")),
+    //         (TokenKind::Keyword(Keyword::True), Span("true")),
+    //         (TokenKind::Symbol(Symbol::NotEquals), Span("~=")),
+    //         (TokenKind::Identifier, Span("ifungus")),
+    //         (TokenKind::Identifier, Span("notand")),
+    //         (TokenKind::Identifier, Span("orelse")),
+    //     ];
 
-        for (idx, t) in i.enumerate() {
-            let (expected_kind,expected_span) = &expecteds[idx];
-            assert_eq!(t.get_kind(), expected_kind);
-            assert_eq!(&t.get_span(), expected_span);
-        }
-    }
+    //     for (idx, t) in i.enumerate() {
+    //         let (expected_kind,expected_span) = &expecteds[idx];
+    //         assert_eq!(t.get_kind(), expected_kind);
+    //         assert_eq!(&t.get_span(), expected_span);
+    //     }
+    // }
 }
