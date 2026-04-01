@@ -218,7 +218,7 @@ impl<'i> Lexer<'i> {
             }
         }
         if self.view.len() > 0 {
-            panic!("failed lexing all, remains:\n{}",self.view);
+            panic!("failed lexing all, remains:\n-----\n{}\n----",self.view);
         }
     }
     fn lex_one(&mut self) -> bool {
@@ -273,9 +273,6 @@ impl<'i> Lexer<'i> {
     }
     pub fn lex_short_literal_string(&mut self) -> Option<Token<'i>> {
         let remains = self.view.as_bytes();
-        dbg!(remains);
-        dbg!(b"\"");
-        dbg!(b"\'");
         let mut quote_kind = None;
         let Some(mut remains) = remains.strip_prefix(b"\"")
             .inspect(|_| quote_kind = Some(b'"'))
@@ -285,37 +282,31 @@ impl<'i> Lexer<'i> {
         else {
             return None;
         };
-        dbg!(quote_kind);
         let quote_kind = quote_kind.expect("if code above is correct, this should never be None");
         let contents_without_opening = remains;
-        dbg!(contents_without_opening);
         let mut raw_contents = None;
 
         while !remains.is_empty() {
-            let Some(maybe_end) = remains.iter().position(|&v| dbg!(dbg!(v)==quote_kind)) else {
+            let Some(maybe_end) = remains.iter().position(|&v| v==quote_kind) else {
                 // while loop still running, so we haven't found end, and now there's no more potential ends left
-                println!("Failed to find the end!");
+                // println!("Failed to find the end!");
                 return None;
             };
-            dbg!(maybe_end);
-            dbg!(remains);
 
             // ..z\\" is not the end of a string, but ..g\\\" is. check for even number of continuous backslashes
             let mut backtrack_check = maybe_end -1;
             let mut backslashes = 0;
-            while (dbg!(remains[backtrack_check]) == dbg!(b'\\')) && (dbg!(backtrack_check) > 0) {
+            while (remains[backtrack_check] == b'\\') && (backtrack_check > 0) {
                 backslashes+=1;
                 backtrack_check -=1;
             }
-            dbg!(backslashes);
             if backslashes%2 == 0 || backslashes == 0 {
-                println!("found the end - no or even backslashes !");
+                // println!("found the end - no or even backslashes !");
                 raw_contents = Some(&contents_without_opening[..contents_without_opening.len()-1]);
-                dbg!(raw_contents);
                 break;
             } else {
                 // THIS IS NOT THE END !! KEEP LOOKING FORWARDS!!
-                println!("Trying again - odd backslashes");
+                // println!("Trying again - odd backslashes");
                 remains = &remains[maybe_end+1..];
                 continue;
             }
@@ -462,60 +453,47 @@ impl<'i> Lexer<'i> {
     /// For convenience, when the opening long bracket is immediately followed by a newline, the newline is not included in the string. (same does not apply for short string)
     pub fn lex_long_literal_string(&mut self) -> Option<Token<'i>> {
         let mut remains = self.view;
-        //dbg!(remains);
-        
         remains = remains.strip_prefix('[')?;
-        //dbg!(remains);
 
         let mut opening_equals = 0;
         while let Some(next_remains) = remains.strip_prefix('=') {
             opening_equals += 1;
             remains = next_remains;
         }
-        //dbg!(opening_equals);
 
         remains = remains.strip_prefix('[')?;
         let span_without_opening = remains;
 
         let mut found_closing = false;
         while !remains.is_empty() {
-            println!("remains is not empty !");
-            //dbg!(remains);
             let Some(potential_closing_start) = remains.find(']') else {
-                println!("we BREAKING");
+                // println!("we BREAKING");
                 break // when no more potential endings, end while loop
             };
             remains = &remains[potential_closing_start..];
-            //dbg!(remains);
             let mut check_close = remains.strip_prefix(']').expect("`remains.find` check above ensures this will not panic");
-            //dbg!(check_close);
 
             let mut closing_equals = 0;
             while let Some(next_check_close) = check_close.strip_prefix('=') {
                 closing_equals += 1;
                 check_close = next_check_close;
             }
-            //dbg!(closing_equals);
-            //dbg!(check_close);
-            //dbg!(remains);
 
             if dbg!(closing_equals != opening_equals) {
-                remains = dbg!(&remains[1..]);
+                remains = &remains[1..];
                 continue;
             }
             if dbg!(!check_close.starts_with(']')) {
-                remains = dbg!(&remains[1..]); 
+                remains = &remains[1..];
                 continue;
             }
             remains = &remains[(2+opening_equals)..];
-            //dbg!(remains);
             found_closing = true;
             break;
         }
-        println!("Loopover!");
 
         if !found_closing {
-            println!("Didn't find any goddamn closing!");
+            // println!("Didn't find any goddamn closing!");
             return None;
         }
 
@@ -524,10 +502,7 @@ impl<'i> Lexer<'i> {
         let end_len = 2+opening_equals;
         let inner_content = &span_without_opening[..span_without_opening.len()-end_len];
 
-        dbg!(span);
-        dbg!(&inner_content);
-
-        self.view = dbg!(&self.view[span.len()..]);
+        self.view = &self.view[span.len()..];
         Some(Token::new(TokenKind::LiteralString(LiteralString::Unescaped(StringContents::Short(inner_content))), Span(span)))
     }
     // pub fn lex_long_literal_string(&mut self) -> Option<Token<'i>> {
