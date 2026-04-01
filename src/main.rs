@@ -24,6 +24,7 @@ fn main() {
    // }
 
    let a = "\"\\u{1F445}\\123\\x3A\\z \nb\\\"c\\\'§\\\\\"";
+   let a = "\" \\n \"";
    let mut b = Lexer::new(a);
    b.lex_to_end();
    dbg!(b);

@@ -1,140 +1,140 @@
 #[cfg(test)]
 mod tests {
-    use crate::lexer_types::{Keyword, Lexer, Span, Symbol, TokenKind};
+    use crate::lexer_types::{Keyword, Lexer, LiteralString, Span, StringContents, Symbol, TokenKind};
 
     #[test]
     fn test_create() {
-        let a_input = "while true";        
-        let a = Lexer::new(a_input);
+        let s = "while true abc! J(@ jg2gh";
+        let l = Lexer::new(s);
 
-        assert_eq!(a.get_internal_view(), a_input);
-        assert_eq!(a.get_internal_lexed().len(), 0);
+        assert_eq!(l.get_view(), s);
+        assert_eq!(l.tokens_len(), 0);
     }
 
     #[test]
     fn test_simple_whitespace() {
-        let mut a = Lexer::new("   ");
-        assert_eq!(a.get_internal_view(), "   ");
-        assert_eq!(a.get_internal_lexed().len(), 0);
-        a.lex_to_end();
-        assert_eq!(a.get_internal_view(), "");
-        assert_eq!(a.get_internal_lexed().len(), 0);
+        let s = "   ";
+        let mut l = Lexer::new(s);
+
+        l.lex_to_end();
+        assert_eq!(l.tokens_len(), 0);
     }
 
     #[test]
     fn test_simple_keyword() {
-        let mut a = Lexer::new("and");
-        a.lex_to_end();
-        assert_eq!(a.get_internal_view(), "");
-        assert_eq!(a.get_internal_lexed().len(), 1);
-        assert_eq!(a.get_internal_lexed()[0].get_kind(), &TokenKind::Keyword(Keyword::And));
+        let mut l = Lexer::new("and");
+        
+        l.lex_to_end();
+        let mut i = l.iter_tokens();
+        assert_eq!(i.next().unwrap().get_kind(), &TokenKind::Keyword(Keyword::And));
+        assert_eq!(i.next(), None);
     }
 
     #[test]
     fn test_simple_symbol() {
-        let mut a = Lexer::new("*");
-        a.lex_to_end();
-        assert_eq!(a.get_internal_view(), "");
-        assert_eq!(a.get_internal_lexed()[0].get_kind(), &TokenKind::Symbol(Symbol::Star));
+        let mut l = Lexer::new("*");
+        
+        l.lex_to_end();
+        let mut i = l.iter_tokens();
+        assert_eq!(i.next().unwrap().get_kind(), &TokenKind::Symbol(Symbol::Star));
+        assert_eq!(i.next(), None);
     }
 
     #[test]
     fn test_simple_identifier() {
-        let mut a = Lexer::new("x y");
-        a.lex_to_end();
-        assert_eq!(a.get_internal_view(), "");
-        assert_eq!(a.get_internal_lexed().len(), 2);
-        assert_eq!(a.get_internal_lexed()[0].get_kind(), &TokenKind::Identifier);
-        assert_eq!(a.get_internal_lexed()[0].get_span(), Span("x"));
-        assert_eq!(a.get_internal_lexed()[1].get_kind(), &TokenKind::Identifier);
-        assert_eq!(a.get_internal_lexed()[1].get_span(), Span("y"));
+        let mut l = Lexer::new("x y");
+        
+        l.lex_to_end();
+        let mut i = l.iter_tokens();
+        assert_eq!(i.next().unwrap().get_kind(), &TokenKind::Identifier);
+        assert_eq!(i.next().unwrap().get_span(), Span("x"));
+        assert_eq!(i.next().unwrap().get_kind(), &TokenKind::Identifier);
+        assert_eq!(i.next().unwrap().get_span(), Span("y"));
+        assert_eq!(i.next(), None);
     }
 
     #[test]
     fn test_long_identifier() {
-        let mut a = Lexer::new("awoifjaw anderthal");
-        a.lex_to_end();
-        assert_eq!(a.get_internal_view(), "");
-
-        let lexed = a.get_internal_lexed();
-        assert_eq!(lexed.len(), 2);
-
-        assert_eq!(lexed[0].get_kind(), &TokenKind::Identifier);
-        assert_eq!(lexed[0].get_span(), Span("awoifjaw"));
-        assert_eq!(lexed[1].get_kind(), &TokenKind::Identifier);
-        assert_eq!(lexed[1].get_span(), Span("anderthal"));
+        let mut l = Lexer::new("awoifjaw anderthal");
+        
+        l.lex_to_end();
+        let mut i = l.iter_tokens();
+        assert_eq!(i.next().unwrap().get_kind(), &TokenKind::Identifier);
+        assert_eq!(i.next().unwrap().get_span(), Span("aifaw"));
+        assert_eq!(i.next().unwrap().get_kind(), &TokenKind::Identifier);
+        assert_eq!(i.next().unwrap().get_span(), Span("anderthal"));
+        assert_eq!(i.next(), None);
     }
 
     #[test]
     fn test_simple_short_string() {
-        let mut a = Lexer::new(r#""ab  c""#);
-        a.lex_to_end();
-        assert_eq!(a.get_internal_view(), "");
-        assert_eq!(a.get_internal_lexed().len(), 1);
-        assert_eq!(a.get_internal_lexed()[0].get_kind(), &TokenKind::LiteralString("ab  c"));
-        assert_eq!(a.get_internal_lexed()[0].get_span(), Span(r#""ab  c""#));
+        let s = r#""ab  c""#;
+        let mut l = Lexer::new(s);
+        l.lex_to_end();
+        let mut i = l.iter_tokens();
+        assert_eq!(
+            i.next().unwrap().get_kind(),
+            &TokenKind::LiteralString(LiteralString::Unescaped(StringContents::Short(s))));
+        
     }
 
     #[test]
     fn test_simple_long_string() {
-        let mut a = Lexer::new("[[ abc\nabc]]");
-        a.lex_to_end();
-        assert_eq!(a.get_internal_view(), "");
-        assert_eq!(a.get_internal_lexed().len(), 1);
-        assert_eq!(a.get_internal_lexed()[0].get_kind(), &TokenKind::LiteralString(" abc\nabc"));
-        assert_eq!(a.get_internal_lexed()[0].get_span(), Span("[[ abc\nabc]]"));
+        let s = "[[ abc\nabc]]";
+        let s1 = " abc\nabc";
+        let mut l = Lexer::new(s);
+        
+        l.lex_to_end();
+        let mut i = l.iter_tokens();
+        let a = i.next().unwrap();
+        assert_eq!(a.get_kind(),
+            &TokenKind::LiteralString(LiteralString::Unescaped(StringContents::Long(s1))));
+        assert_eq!(a.get_span(), Span(s));
+        assert_eq!(i.next(), None);
     }
     
     #[test]
     fn test_complicated_long_string() {
-        let mut a = Lexer::new("[==[ [abc\nabc] ]==]");
-        a.lex_to_end();
-        assert_eq!(a.get_internal_view(), "");
-        assert_eq!(a.get_internal_lexed().len(), 1);
-        assert_eq!(a.get_internal_lexed()[0].get_kind(), &TokenKind::LiteralString(" [abc\nabc] "));
-        assert_eq!(a.get_internal_lexed()[0].get_span(), Span("[==[ [abc\nabc] ]==]"));
+        let s = "[==[ [abc\nabc] ]==]";
+        let s1 = " [abc\nabc] ";
+        let mut l = Lexer::new(s);
+
+        l.lex_to_end();
+        let mut i = l.iter_tokens();
+        let a = i.next().unwrap();
+        assert_eq!(a.get_kind(),
+            &TokenKind::LiteralString(LiteralString::Unescaped(StringContents::Long(s1))));
+        assert_eq!(a.get_span(), Span(s));
+        assert_eq!(i.next(), None);
     }
 
     #[test]
     fn test_long_all() {
-        let mut a = Lexer::new("and   * \n / break=orville]true~= luna anderson ");
-        a.lex_to_end();
-        assert_eq!(a.get_internal_view(), "");
+        let s = "and   * \n / break=orville]true~= ifungus notand orelse";
+        let mut l = Lexer::new(s);
         
-        let lexed = a.get_internal_lexed();
-        // assert_eq!(lexed.len(), 11);
-        
-        assert_eq!(lexed[0].get_kind(), &TokenKind::Keyword(Keyword::And));
-        assert_eq!(lexed[0].get_span(), Span("and"));
+        l.lex_to_end();
+        let i = l.iter_tokens();
 
-        assert_eq!(lexed[1].get_kind(), &TokenKind::Symbol(Symbol::Star));
-        assert_eq!(lexed[1].get_span(), Span("*"));
-        
-        assert_eq!(lexed[2].get_kind(), &TokenKind::Symbol(Symbol::Slash));
-        assert_eq!(lexed[2].get_span(), Span("/"));
-        
-        assert_eq!(lexed[3].get_kind(), &TokenKind::Keyword(Keyword::Break));
-        assert_eq!(lexed[3].get_span(), Span("break"));
-        
-        assert_eq!(lexed[4].get_kind(), &TokenKind::Symbol(Symbol::Equals));
-        assert_eq!(lexed[4].get_span(), Span("="));
+        let expecteds = [
+            (TokenKind::Keyword(Keyword::And), Span("and")),
+            (TokenKind::Symbol(Symbol::Star), Span("*")),
+            (TokenKind::Symbol(Symbol::Slash), Span("/")),
+            (TokenKind::Keyword(Keyword::Break), Span("break")),
+            (TokenKind::Symbol(Symbol::Equals), Span("=")),
+            (TokenKind::Identifier, Span("orville")),
+            (TokenKind::Symbol(Symbol::RBracket), Span("]")),
+            (TokenKind::Keyword(Keyword::True), Span("true")),
+            (TokenKind::Symbol(Symbol::NotEquals), Span("~=")),
+            (TokenKind::Identifier, Span("ifungus")),
+            (TokenKind::Identifier, Span("notand")),
+            (TokenKind::Identifier, Span("orelse")),
+        ];
 
-        assert_eq!(lexed[5].get_kind(), &TokenKind::Identifier);
-        assert_eq!(lexed[5].get_span(), Span("orville"));
-
-        assert_eq!(lexed[6].get_kind(), &TokenKind::Symbol(Symbol::RBracket));
-        assert_eq!(lexed[6].get_span(), Span("]"));
-        
-        assert_eq!(lexed[7].get_kind(), &TokenKind::Keyword(Keyword::True));
-        assert_eq!(lexed[7].get_span(), Span("true"));
-        
-        assert_eq!(lexed[8].get_kind(), &TokenKind::Symbol(Symbol::NotEquals));
-        assert_eq!(lexed[8].get_span(), Span("~="));
-
-        assert_eq!(lexed[9].get_kind(), &TokenKind::Identifier);
-        assert_eq!(lexed[9].get_span(), Span("luna"));
-        
-        assert_eq!(lexed[10].get_kind(), &TokenKind::Identifier);
-        assert_eq!(lexed[10].get_span(), Span("anderson"));
+        for (idx, t) in i.enumerate() {
+            let (expected_kind,expected_span) = &expecteds[idx];
+            assert_eq!(t.get_kind(), expected_kind);
+            assert_eq!(&t.get_span(), expected_span);
+        }
     }
 }
