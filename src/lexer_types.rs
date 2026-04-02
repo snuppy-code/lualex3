@@ -239,7 +239,7 @@ impl<'i> LiteralString<'i> {
                 res.push(b);
                 continue;
             }
-            let escape_c = bytes.next().expect("Trailing slash should have been caught in string lexing, not escaping !");
+            let escape_c = bytes.next().expect("Trailing slash should have been caught by string lexing, not by escaping !");
             match escape_c {
                 b'a' => res.push(b'\x07'),
                 b'b' => res.push(b'\x08'),
@@ -256,7 +256,7 @@ impl<'i> LiteralString<'i> {
                 b'z' => {
                     while bytes.peek().is_some() &&
                           bytes.peek().unwrap().is_ascii_whitespace() { //might be a problem, unicode whitespace
-                        bytes.next();
+                        bytes.next().unwrap();
                     }
                 },
 
@@ -324,7 +324,6 @@ impl<'i> LiteralString<'i> {
                         len += 1;
                     }
                     let s = str::from_utf8(&decimals_b[..len]).unwrap();
-                    dbg!(s);
                     let v = u8::from_str_radix(s, 10).expect("Invalid decimal escape! out of u8 range");
                     res.push(v);
                 },

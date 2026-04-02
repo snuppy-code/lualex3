@@ -103,7 +103,7 @@ b"#;
 \
 \n
 \u{000000078} \65 \118 \a \" \\\\"#;
-        let s_escaped = "a\\\n\nx A v \u{7} \" \\\\";
+        let s_escaped = "a\n\n\nx A v \u{7} \" \\\\";
         let mut l = Lexer::new(s);
         l.lex_to_end();
         let mut i = l.iter_tokens().peekable();
