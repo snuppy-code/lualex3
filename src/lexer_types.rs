@@ -323,9 +323,9 @@ impl<'i> LiteralString<'i> {
                         decimals_b[len] = bytes.next().unwrap();
                         len += 1;
                     }
-
                     let s = str::from_utf8(&decimals_b[..len]).unwrap();
-                    let v = u8::from_str_radix(s, 16).expect("Invalid decimal escape! out of u8 range");
+                    dbg!(s);
+                    let v = u8::from_str_radix(s, 10).expect("Invalid decimal escape! out of u8 range");
                     res.push(v);
                 },
 
@@ -333,7 +333,7 @@ impl<'i> LiteralString<'i> {
             };
         }
 
-        todo!();
+        LiteralString::Escaped(String::from_utf8(res).unwrap())
     }
     fn escape_long(s: &'i str   ) -> Self {
         todo!();
