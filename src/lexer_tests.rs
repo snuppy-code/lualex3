@@ -138,37 +138,9 @@ b"#;
         let mut i = l.iter_tokens().peekable();
         assert_eq!(i.peek().unwrap().get_kind(),
             &TokenKind::LiteralString(LiteralString::UnescapedLong(s1)));
-        assert_eq!(i.next().unwrap().get_span(), Span(s));
+        assert_eq!(i.peek().unwrap().get_span(), Span(s));
+        assert_eq!(i.next().unwrap().get_kind().get_literal_string().unwrap().escape(),
+            LiteralString::Escaped(String::from(s1)));
         assert_eq!(i.next(), None);
     }
-
-    // #[test]
-    // fn test_long_all() {
-    //     let s = "and   * \n / break=orville]true~= ifungus notand orelse";
-    //     let mut l = Lexer::new(s);
-        
-    //     l.lex_to_end();
-    //     let i = l.iter_tokens();
-
-    //     let expecteds = [
-    //         (TokenKind::Keyword(Keyword::And), Span("and")),
-    //         (TokenKind::Symbol(Symbol::Star), Span("*")),
-    //         (TokenKind::Symbol(Symbol::Slash), Span("/")),
-    //         (TokenKind::Keyword(Keyword::Break), Span("break")),
-    //         (TokenKind::Symbol(Symbol::Equals), Span("=")),
-    //         (TokenKind::Identifier, Span("orville")),
-    //         (TokenKind::Symbol(Symbol::RBracket), Span("]")),
-    //         (TokenKind::Keyword(Keyword::True), Span("true")),
-    //         (TokenKind::Symbol(Symbol::NotEquals), Span("~=")),
-    //         (TokenKind::Identifier, Span("ifungus")),
-    //         (TokenKind::Identifier, Span("notand")),
-    //         (TokenKind::Identifier, Span("orelse")),
-    //     ];
-
-    //     for (idx, t) in i.enumerate() {
-    //         let (expected_kind,expected_span) = &expecteds[idx];
-    //         assert_eq!(t.get_kind(), expected_kind);
-    //         assert_eq!(&t.get_span(), expected_span);
-    //     }
-    // }
 }

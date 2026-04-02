@@ -226,10 +226,6 @@ impl<'i> LiteralString<'i> {
             Self::Escaped(_) => panic!("This LiteralString is already escaped!"),
         }
     }
-    // some funky ideas for optimization:
-    // - construct the final thing partially out of string slices from s, filling in gaps with owned chars - do not produce a String but more like a list of string slices and chars - probably bad because how annoying would that be to pass on as a part of this function's contract or whatever
-    // - find a smarter way to do less individual copies. unsure if rustc compiles it away and does sections in a smarter way?
-    //
     fn escape_short(s: &'i str) -> Self {
         let mut res = Vec::with_capacity(s.len());
         let mut bytes = s.bytes().peekable();
@@ -334,8 +330,35 @@ impl<'i> LiteralString<'i> {
 
         LiteralString::Escaped(String::from_utf8(res).unwrap())
     }
-    fn escape_long(s: &'i str   ) -> Self {
-        todo!();
+    fn escape_long(s: &'i str) -> Self {
+        let mut res = Vec::with_capacity(s.len());
+        let mut bytes = s.bytes().peekable();
+
+        // For convenience, when the opening long bracket is immediately followed by a newline, the newline is not included in the string.
+        if let Some(10_u8) = bytes.peek() {
+            bytes.next();
+        }
+
+        // Any kind of end-of-line sequence (carriage return, newline, carriage return followed by newline, or newline followed by carriage return) is converted to a simple newline.
+        while let Some(b) = bytes.next() {
+            match b {
+                10_u8 => {
+                    if let Some(&13_u8) = bytes.peek() {
+                        bytes.next();
+                    }
+                    res.push(10_u8);
+                },
+                13_u8 => {
+                    if let Some(&10_u8) = bytes.peek() {
+                        bytes.next();
+                    }
+                    res.push(10_u8);
+                },
+                _ => res.push(b),
+            }
+        }
+
+        LiteralString::Escaped(String::from_utf8(res).unwrap())
     }
 }
 
