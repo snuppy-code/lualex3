@@ -1,6 +1,4 @@
-use std::str::from_utf8;
-// https://www.lua.org/manual/5.3/manual.html
-
+use std::{io::Bytes, str::from_utf8};
 
 #[derive(Debug, PartialEq)]
 pub enum TokenKind<'i> {
@@ -424,6 +422,7 @@ impl<'i> Lexer<'i> {
     }
     fn lex_one(&mut self) -> bool {
         self.skip_whitespace();
+        self.skip_comments(); // not 100% confident this is correct
 
         let res = self
             .lex_identifier_or_keyword()
@@ -470,7 +469,81 @@ impl<'i> Lexer<'i> {
         })
     }
     pub fn lex_numeric_constant(&mut self) -> Option<Token<'i>> {
-        None
+        let mut bytes = self.view.bytes().peekable();
+
+        let mut is_hex_const = false;
+        if let Some(b'0') = bytes.next() {
+            if let Some(b'x' | b'X') = bytes.peek() {
+                bytes.next();
+                is_hex_const = true;
+            }
+        }
+        if is_hex_const {
+            let mut has_fractional_part = false;
+            let mut integer_part = Vec::new();
+            while let Some(b) = bytes.next() {
+                if b == b'.' {
+                    println!("Found end of integer part of hex const - found fractional part");
+                    has_fractional_part = true;
+                    break;
+                }
+                if !b.is_ascii_hexdigit() {
+                    println!("Found end of integer part of hex const.");
+                    break;
+                }
+                integer_part.push(b);
+            }
+            if has_fractional_part {
+                let mut has_exponent = false;
+                let mut fractional_part = Vec::new();
+                while let Some(b) = bytes.next() {
+                    if b == b'p' {
+                        println!("Found end of fractional part of hex const - moving to exponent part");
+                        has_exponent = true;
+                        break;
+                    }
+                    if !b.is_ascii_hexdigit() {
+                        println!("Found end of fractional part of hex const.");
+                        break;
+                    }
+                    fractional_part.push(b);
+                }
+                if has_exponent {
+                    let mut sign = 1;
+                    match bytes.peek() {
+                        Some(b'-') => {
+                            bytes.next();
+                            sign = -1;
+                        },
+                        Some(b'+') => {
+                            bytes.next();
+                        },
+                        _ => {},
+                    };
+
+                    let mut exponent_part = Vec::new();
+                    while let Some(b) = bytes.next() {
+                        if !b.is_ascii_digit() {
+                            println!("Found end of exponent part of hex const.");
+                            break;
+                        }
+                        exponent_part.push(b);
+                    }
+                    println!("Found hex const:\nInteger part: {}\nFractional part:{}\nSign: {} Exponent part:{}",
+                        String::from_utf8(integer_part).unwrap(),String::from_utf8(fractional_part).unwrap(),sign,String::from_utf8(exponent_part).unwrap());
+                    println!("Parse attempt: {:?}",)
+
+                    let 
+
+                }
+            }
+        } else {
+
+        }
+        
+
+
+        todo!();
     }
     pub fn lex_short_literal_string(&mut self) -> Option<Token<'i>> {
         let remains = self.view.as_bytes();
@@ -554,11 +627,11 @@ impl<'i> Lexer<'i> {
                 check_close = next_check_close;
             }
 
-            if dbg!(closing_equals != opening_equals) {
+            if closing_equals != opening_equals {
                 remains = &remains[1..];
                 continue;
             }
-            if dbg!(!check_close.starts_with(']')) {
+            if !check_close.starts_with(']') {
                 remains = &remains[1..];
                 continue;
             }
@@ -568,7 +641,6 @@ impl<'i> Lexer<'i> {
         }
 
         if !found_closing {
-            // println!("Didn't find any goddamn closing!");
             return None;
         }
 
@@ -700,5 +772,107 @@ impl<'i> Lexer<'i> {
         } else {
             None
         }
+    }
+    
+    fn skip_comments_one(&mut self) {
+        let mut bytes = self.view.bytes().peekable();
+        if bytes.peek() != Some(&b'-') {
+            return;
+        }
+        bytes.next();
+        if bytes.peek() != Some(&b'-') {
+            return;
+        }
+        bytes.next();
+
+        let mut is_long = false;
+        let mut opening_eq = 0;
+        if bytes.next() == Some(b'[') {
+            while let Some(&b'=') = bytes.peek() {
+                bytes.next();
+                opening_eq+=1;
+            }
+            if bytes.next() == Some(b'[') {
+                is_long = true;
+            }
+        }
+
+        // skip short comment
+        if !is_long {
+            while bytes.next() != Some(b'\n') {
+            };
+
+            self.view = &self.view[self.view.len()-bytes.len()..];
+            return;
+        }
+
+        while let Some(b) = bytes.next() {
+            if b == b']' {
+                let mut closing_eq = 0;
+                while let Some(&b'=') = bytes.peek() {
+                    bytes.next();
+                    closing_eq+=1;
+                }
+                if closing_eq==opening_eq && bytes.next() == Some(b']') {
+                    self.view = &self.view[self.view.len()-bytes.len()..];
+                    return;
+                }
+            }
+        }
+        panic!("Unclosed long comment !");
+    }
+    fn skip_comments_two(&mut self) {
+        let bytes = self.view.as_bytes();
+        let mut cursor = 0;
+
+        if bytes.get(cursor) != Some(&b'-') {
+            return;
+        }
+        cursor+=1;
+        
+        if bytes.get(cursor) != Some(&b'-') {
+            return;
+        }
+        cursor+=1;
+
+        let mut is_long = false;
+        let mut opening_eq = 0;
+        if bytes.get(cursor) == Some(&b'[') {
+            cursor+=1;
+            while let Some(&b'=') = bytes.get(cursor) {
+                cursor+=1;
+                opening_eq+=1;
+            }
+            if bytes.get(cursor) == Some(&b'[') {
+                cursor+=1;
+                is_long = true;
+            }
+        }
+
+        // skip short comment
+        if !is_long {
+            while bytes.get(cursor) != Some(&b'\n') {
+                cursor+=1;
+            };
+
+            self.view = &self.view[cursor..];
+            return;
+        }
+
+        while let Some(b) = bytes.get(cursor) {
+            cursor+=1;
+            if b == &b']' {
+                let mut closing_eq = 0;
+                while let Some(&b'=') = bytes.get(cursor) {
+                    cursor+=1;
+                    closing_eq+=1;
+                }
+                if closing_eq==opening_eq && bytes.get(cursor) == Some(&b']') {
+                    self.view = &self.view[cursor..];
+                    return;
+                }
+            }
+        }
+        panic!("Unclosed long comment !");
     }
 }
