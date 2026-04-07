@@ -1,4 +1,4 @@
-use std::{f32::consts::E, io::Bytes, str::from_utf8};
+use crate::util::*;
 
 #[derive(Debug, PartialEq)]
 pub enum TokenKind<'i> {
@@ -468,82 +468,129 @@ impl<'i> Lexer<'i> {
             }
         })
     }
+    /*  Hexadecimal constants:
+            MUST have an integer or fractional part.
+            If it has an exponent marker 'p'|'P' then it must have an exponent part.
+            Integer and fractional parts are hexadecimal, exponent part is decimal.
+        --Valid--
+        0x0.0p0
+        0x0.p0
+        0x.0p0
+        0x0.0
+        0x.0
+        0x0.
+        0x.0p0
+        --Invalid--
+        0xp0
+        0x
+        0x.
+        0x.p0
+        0x.0p
+        0x0.0p*/
     pub fn lex_numeric_constant(&mut self) -> Option<Token<'i>> {
-        let mut bytes = self.view.bytes().peekable();
-
+        let bytes = self.view.as_bytes();
+        let mut cursor = 0;
+        
         let mut is_hex_const = false;
-        if let Some(b'0') = bytes.next() {
-            if let Some(b'x' | b'X') = bytes.peek() {
-                bytes.next();
-                is_hex_const = true;
-            }
-        }
-        if is_hex_const {
-            let mut has_fractional_part = false;
-            let mut integer_part = Vec::new();
-            while let Some(b) = bytes.next() {
-                if b == b'.' {
-                    println!("Found end of integer part of hex const - found fractional part");
-                    has_fractional_part = true;
-                    break;
-                }
-                if !b.is_ascii_hexdigit() {
-                    println!("Found end of integer part of hex const.");
-                    break;
-                }
-                integer_part.push(b);
-            }
-            if has_fractional_part {
-                let mut has_exponent = false;
-                let mut fractional_part = Vec::new();
-                while let Some(b) = bytes.next() {
-                    if b == b'p' {
-                        println!("Found end of fractional part of hex const - moving to exponent part");
-                        has_exponent = true;
-                        break;
-                    }
-                    if !b.is_ascii_hexdigit() {
-                        println!("Found end of fractional part of hex const.");
-                        break;
-                    }
-                    fractional_part.push(b);
-                }
-                if has_exponent {
-                    let mut sign = 1;
-                    match bytes.peek() {
-                        Some(b'-') => {
-                            bytes.next();
-                            sign = -1;
-                        },
-                        Some(b'+') => {
-                            bytes.next();
-                        },
-                        _ => {},
-                    };
-
-                    let mut exponent_part = Vec::new();
-                    while let Some(b) = bytes.next() {
-                        if !b.is_ascii_digit() {
-                            println!("Found end of exponent part of hex const.");
-                            break;
-                        }
-                        exponent_part.push(b);
-                    }
-                    println!("Found hex const:\nInteger part: {}\nFractional part:{}\nSign: {} Exponent part:{}",
-                        String::from_utf8(integer_part).unwrap(),String::from_utf8(fractional_part).unwrap(),sign,String::from_utf8(exponent_part).unwrap());
-                    println!("Parse attempt: {:?}",)
-
-                    let 
-
-                }
-            }
-        } else {
-
+        if bytes.starts_with(b"0x") || bytes.starts_with(b"0X") {
+            cursor+=2;
+            is_hex_const = true;
         }
         
+        if !is_hex_const {
+            todo!("normal float or int literal");
+        }
+        
+        let mut int_part_b = Vec::new();
+        let mut frac_part_b = Vec::new();
+        let mut exp_part_b = Vec::new();
 
+        while let Some(&b) = bytes.get(cursor) { // int part
+            if !b.is_ascii_hexdigit() {
+                break;
+            }
+            cursor+=1;
+            int_part_b.push(b);
+        }
+        
+        if bytes.get(cursor) == Some(&b'.') { // frac part
+            cursor+=1;
 
-        todo!();
+            while let Some(&b) = bytes.get(cursor) {
+                if !b.is_ascii_hexdigit() {
+                    break;
+                }
+                cursor+=1;
+                frac_part_b.push(b);
+            }
+        }
+
+        if int_part_b.len() == 0 && frac_part_b.len() == 0 {
+            panic!("hex constant needs integer part or fractional part!");
+        }
+
+        if bytes.get(cursor) == Some(&(b'p'|b'P')) { // exp part
+            cursor+=1;
+
+            match bytes.get(cursor) {
+                Some(b'-') => {
+                    cursor+=1;
+                    exp_part_b.push(b'-');
+                },
+                Some(b'+') => {
+                    cursor+=1;
+                }
+                _ => {},
+            };
+
+            let mut added_exp_digit = false;
+            while let Some(&b) = bytes.get(cursor) {
+                if !b.is_ascii_digit() {
+                    break;
+                }
+                cursor+=1;
+                added_exp_digit = true;
+                exp_part_b.push(b);
+            }
+            if !added_exp_digit {
+                panic!("Malformed exponent");
+            }
+        }
+
+        let mut significand = 0.;
+        if int_part_b.len() > 0 {
+            let int_part_s = String::from_utf8(int_part_b).expect("Invalid utf8 in integer part");
+            println!("int: {int_part_s}");
+            let int_part = i64::from_str_radix(&int_part_s, 16).unwrap() as f64;
+            println!("int: {int_part}");
+            significand+=int_part;
+        }
+        if frac_part_b.len() > 0 {
+            let frac_part_s = String::from_utf8(frac_part_b).expect("Invalid utf8 in fractional part");
+            println!("frac: {frac_part_s}");
+            let frac_part = {
+                let x = i64::from_str_radix(&frac_part_s, 16).unwrap();
+                (x as f64) / 16_f64.powi(frac_part_s.len() as i32)
+            };
+            println!("frac: {frac_part}");
+            significand+=frac_part;
+        }
+        let mut value = significand;
+        if exp_part_b.len() > 0 {
+            let exp_part_s = String::from_utf8(exp_part_b).expect("Invalid utf8 in exponent part");
+            println!("exp: {exp_part_s}\n");
+            let exp_part = i32::from_str_radix(&exp_part_s, 10).unwrap();
+            println!("exp: {exp_part}");
+    
+            value = significand*2_f64.powi(exp_part);
+        }
+        println!("{value}");
+        
+        let kind = TokenKind::NumericConstant(NumericConstant::Float(value));
+        let span = &self.view[..cursor];
+        self.view = &self.view[cursor..];
+        
+        return Some(Token::new(kind, Span(span)));
     }
     pub fn lex_short_literal_string(&mut self) -> Option<Token<'i>> {
         let remains = self.view.as_bytes();
