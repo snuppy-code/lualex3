@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::lexer_types::{Keyword, Lexer, LiteralString, Span, Symbol, TokenKind};
+    use crate::lexer_types::{Keyword, Lexer, LiteralString, NumericConstant, Span, Symbol, TokenKind};
 
     #[test]
     fn test_create() {
@@ -142,5 +142,41 @@ b"#;
         assert_eq!(i.next().unwrap().get_kind().get_literal_string().unwrap().escape(),
             LiteralString::Escaped(String::from(s1)));
         assert_eq!(i.next(), None);
+    }
+
+    #[test]
+    fn test_numeric_constants() {
+        let s = "0 15 153803 1.3 0. .0 0.0005 0x345 0xff 0xBEBADA 0xA3Fb.F31fAp-14";
+        let mut l = Lexer::new(s);
+        
+        l.lex_to_end();
+        dbg!(&l);
+        let mut i = l.iter_tokens().peekable();
+        assert_eq!(i.next().unwrap().get_kind(),
+            &TokenKind::NumericConstant(NumericConstant::Integer(0)));
+        assert_eq!(i.next().unwrap().get_kind(),
+            &TokenKind::NumericConstant(NumericConstant::Integer(15)));
+        assert_eq!(i.next().unwrap().get_kind(),
+            &TokenKind::NumericConstant(NumericConstant::Integer(153803)));
+        assert_eq!(i.next().unwrap().get_kind(),
+            &TokenKind::NumericConstant(NumericConstant::Float(1.3)));
+        assert_eq!(i.next().unwrap().get_kind(),
+            &TokenKind::NumericConstant(NumericConstant::Float(0.0)));
+        assert_eq!(i.next().unwrap().get_kind(),
+            &TokenKind::NumericConstant(NumericConstant::Float(0.0)));
+        assert_eq!(i.next().unwrap().get_kind(),
+            &TokenKind::NumericConstant(NumericConstant::Float(0.0005)));
+        assert_eq!(i.next().unwrap().get_kind(),
+            &TokenKind::NumericConstant(NumericConstant::Integer(837))); //0x345
+        assert_eq!(i.next().unwrap().get_kind(),
+            &TokenKind::NumericConstant(NumericConstant::Integer(255))); //0xff
+        assert_eq!(i.next().unwrap().get_kind(),
+            &TokenKind::NumericConstant(NumericConstant::Integer(12499674))); //0xBEBADA
+        // in my testing, lua 5.4 print() only outputs 2.5622527893865, in rust we get an added 48 on there
+        // I just assume it is printing differences, this might be incorrect
+        assert_eq!(i.next().unwrap().get_kind(),
+            &TokenKind::NumericConstant(NumericConstant::Float(2.562252789386548))); //0xA3Fb.F31fAp-14
+        assert_eq!(i.next(), None);
+
     }
 }

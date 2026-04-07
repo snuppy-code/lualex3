@@ -468,173 +468,22 @@ impl<'i> Lexer<'i> {
             }
         })
     }
-    /*  Hexadecimal constants:
-            MUST have an integer or fractional part.
-            If it has an exponent marker 'p'|'P' then it must have an exponent part.
-            Integer and fractional parts are hexadecimal, exponent part is decimal.
-        --Valid--
-        0x0.0p0
-        0x0.p0
-        0x.0p0
-        0x0.0
-        0x.0
-        0x0.
-        0x.0p0
-        --Invalid--
-        0xp0
-        0x
-        0x.
-        0x.p0
-        0x.0p
-        0x0.0p*/
     pub fn lex_numeric_constant(&mut self) -> Option<Token<'i>> {
         let bytes = self.view.as_bytes();
         let mut cursor = 0;
         
-        if !(bytes.starts_with(b"0x") || bytes.starts_with(b"0X")) { // normal int or float constant
-            let mut number_bytes = Vec::new();
-            while let Some(&b) = bytes.get(cursor) {
-                if !b.is_ascii_digit() {
-                    break;
-                }
-                cursor+=1;
-                number_bytes.push(b);
-            }
-
-            if bytes.get(cursor) != Some(&b'.') {
-                if number_bytes.len() == 0 {
-                    return None;
-                }
-                let int_part_s = str::from_utf8(&number_bytes).unwrap();
-                let value = i64::from_str_radix(int_part_s, 10).unwrap();
-                let kind = TokenKind::NumericConstant(NumericConstant::Integer(value));
-                let span = &self.view[..cursor];
-                self.view = &self.view[cursor..];
-                
-                return Some(Token::new(kind, Span(span)));
-            }
-            cursor+=1;
-            number_bytes.push(b'.');
-
-            while let Some(&b) = bytes.get(cursor) {
-                if !b.is_ascii_digit() {
-                    break;
-                }
-                cursor+=1;
-                number_bytes.push(b);
-            }
-
-            let number_s = str::from_utf8(&number_bytes).unwrap();
-            let value = number_s.parse::<f64>().unwrap();
-            let kind = TokenKind::NumericConstant(NumericConstant::Float(value));
-            let span = &self.view[..cursor];
-            self.view = &self.view[cursor..];
-            
-            return Some(Token::new(kind, Span(span)));
+        if bytes.starts_with(b"0x") || bytes.starts_with(b"0X") { 
+            // is hex constant
+            cursor+=2;
+            return self.lex_hexadecimal_numeric_constant(bytes,cursor);
         }
-        // is hex constant
-        cursor+=2;
-
-        let mut internally_int = true;
-        let mut int_part_b = Vec::new();
-        let mut frac_part_b = Vec::new();
-        let mut exp_part_b = Vec::new();
-
-        while let Some(&b) = bytes.get(cursor) { // int part
-            if !b.is_ascii_hexdigit() {
-                break;
-            }
-            cursor+=1;
-            int_part_b.push(b);
-        }
-
-        if bytes.get(cursor) == Some(&b'.') { // frac part
-            internally_int = true;
-            cursor+=1;
-
-            while let Some(&b) = bytes.get(cursor) {
-                if !b.is_ascii_hexdigit() {
-                    break;
-                }
-                cursor+=1;
-                frac_part_b.push(b);
-            }
-        }
-
-        if int_part_b.len() == 0 && frac_part_b.len() == 0 {
-            panic!("hex constant needs integer part or fractional part!");
-        }
-
-        if bytes.get(cursor) == Some(&(b'p'|b'P')) { // exp part
-            internally_int = true;
-            cursor+=1;
-
-            match bytes.get(cursor) {
-                Some(b'-') => {
-                    cursor+=1;
-                    exp_part_b.push(b'-');
-                },
-                Some(b'+') => {
-                    cursor+=1;
-                }
-                _ => {},
-            };
-
-            let mut added_exp_digit = false;
-            while let Some(&b) = bytes.get(cursor) {
-                if !b.is_ascii_digit() {
-                    break;
-                }
-                cursor+=1;
-                added_exp_digit = true;
-                exp_part_b.push(b);
-            }
-            if !added_exp_digit {
-                panic!("Malformed exponent");
-            }
-        }
-
-        if internally_int {
-            let value = i64::from_str_radix(str::from_utf8(&int_part_b).unwrap(), 16).unwrap();
-            let kind = TokenKind::NumericConstant(NumericConstant::Integer(value));
-            let span = &self.view[..cursor];
-            self.view = &self.view[cursor..];
-            
-            return Some(Token::new(kind, Span(span)));
-        }
-
-        let s = {
-            let mut s= String::from("0x");
-
-            if int_part_b.len() > 0 {
-                let int_part_s = str::from_utf8(&int_part_b).expect("Invalid utf8 in integer part");
-                s.push_str(int_part_s);
-            } else {
-                s.push('0');
-            }
-            s.push('.');
-            if frac_part_b.len() > 0 {
-                let frac_part_s = str::from_utf8(&frac_part_b).expect("Invalid utf8 in fractional part");
-                s.push_str(frac_part_s);
-            } else {
-                s.push('0');
-            }
-            s.push('p');
-            if exp_part_b.len() > 0 {
-                let exp_part_s = str::from_utf8(&exp_part_b).expect("Invalid utf8 in exponent part");
-                s.push_str(&exp_part_s);
-            } else {
-                s.push_str("0");
-            }
-
-            s
+        // normal int or float constant
+        match bytes.get(cursor..) {
+            Some([b'0'..=b'9', ..]) | Some([b'.', b'0'..=b'9', ..]) => {
+                return self.lex_decimal_numeric_constant(bytes, cursor);
+            },
+            _ => return None,
         };
-        let value = hexf_parse::parse_hexf64(&s, false).unwrap();
-        let kind = TokenKind::NumericConstant(NumericConstant::Float(value));
-        let span = &self.view[..cursor];
-        self.view = &self.view[cursor..];
-        
-        return Some(Token::new(kind, Span(span)));
     }
     pub fn lex_short_literal_string(&mut self) -> Option<Token<'i>> {
         let remains = self.view.as_bytes();
@@ -915,5 +764,205 @@ impl<'i> Lexer<'i> {
         }
 
         panic!("Unclosed long comment !");
+    }
+    
+    fn lex_decimal_numeric_constant(&mut self, bytes: &'i [u8], cursor: usize) -> Option<Token<'i>> {
+        let mut cursor = cursor;
+        let mut internally_int = true;
+        let mut int_part_bs = Vec::new();
+        let mut frac_part_bs = Vec::new();
+        let mut exp_part_bs = Vec::new();
+
+        while let Some(&b) = bytes.get(cursor) {
+            if !b.is_ascii_digit() {
+                break;
+            }
+            cursor+=1;
+            int_part_bs.push(b);
+        }
+
+        if bytes.get(cursor) == Some(&b'.') {
+            internally_int = false;
+            cursor+=1;
+            while let Some(&b) = bytes.get(cursor) {
+                if !b.is_ascii_digit() {
+                    break;
+                }
+                cursor+=1;
+                frac_part_bs.push(b);
+            }
+        }
+
+        if int_part_bs.len() == 0 && frac_part_bs.len() == 0 {
+            panic!("decimal numeric constant needs at least an integer or fractional part !");
+        }
+
+        if bytes.get(cursor) == Some(&(b'e'|b'E')) {
+            cursor+=1;
+            while let Some(&b) = bytes.get(cursor) {
+                if !b.is_ascii_digit() {
+                    break;
+                }
+                cursor+=1;
+                exp_part_bs.push(b);
+            }
+        }
+
+        if internally_int {
+            let int_part_s = str::from_utf8(&int_part_bs).unwrap();
+            let value = i64::from_str_radix(int_part_s, 10).unwrap();
+            let kind = TokenKind::NumericConstant(NumericConstant::Integer(value));
+            let span = &self.view[..cursor];
+            self.view = &self.view[cursor..];
+            
+            return Some(Token::new(kind, Span(span)));
+        }
+
+        let s = {
+            let mut s = String::new();
+            if int_part_bs.len() > 0 {
+                let int_part_s = str::from_utf8(&int_part_bs).unwrap();
+                s.push_str(&int_part_s);
+            } else {
+                s.push('0');
+            }
+            if frac_part_bs.len() > 0 {
+                let frac_part_s = str::from_utf8(&frac_part_bs).unwrap();
+                s.push('.');
+                s.push_str(&frac_part_s);
+            } else {
+                s.push('0');
+            }
+            if exp_part_bs.len() > 0 {
+                let exp_part_s = str::from_utf8(&exp_part_bs).unwrap();
+                s.push('e');
+                s.push_str(&exp_part_s);
+            }
+
+            s
+        };
+        
+        let value = s.parse::<f64>().unwrap();
+        let kind = TokenKind::NumericConstant(NumericConstant::Float(value));
+        let span = &self.view[..cursor];
+        self.view = &self.view[cursor..];
+        
+        return Some(Token::new(kind, Span(span)));
+    }
+    /*  Hexadecimal constants:
+            MUST have an integer or fractional part.
+            If it has an exponent marker 'p'|'P' then it must have an exponent part.
+            Integer and fractional parts are hexadecimal, exponent part is decimal.
+        --Valid--
+        0x0.0p0
+        0x0.p0
+        0x.0p0
+        0x0.0
+        0x.0
+        0x0.
+        0x.0p0
+        --Invalid--
+        0xp0
+        0x
+        0x.
+        0x.p0
+        0x.0p
+        0x0.0p*/
+    fn lex_hexadecimal_numeric_constant(&mut self, bytes: &'i [u8], cursor: usize) -> Option<Token<'i>> {
+        let mut cursor = cursor;
+        let mut internally_int = true;
+        let mut int_part_b = Vec::new();
+        let mut frac_part_b = Vec::new();
+        let mut exp_part_b = Vec::new();
+
+        while let Some(&b) = bytes.get(cursor) {
+            if !b.is_ascii_hexdigit() {
+                break;
+            }
+            cursor+=1;
+            int_part_b.push(b);
+        }
+
+        if bytes.get(cursor) == Some(&b'.') {
+            internally_int = false;
+            cursor+=1;
+
+            while let Some(&b) = bytes.get(cursor) {
+                if !b.is_ascii_hexdigit() {
+                    break;
+                }
+                cursor+=1;
+                frac_part_b.push(b);
+            }
+        }
+
+        if int_part_b.len() == 0 && frac_part_b.len() == 0 {
+            panic!("hex constant needs integer part or fractional part!");
+        }
+
+        if let Some(&(b'p'|b'P')) = bytes.get(cursor) {
+            internally_int = false;
+            cursor+=1;
+
+            if let Some(&s @ (b'-' | b'+')) = bytes.get(cursor) {
+                cursor+=1;
+                exp_part_b.push(s);
+            }
+
+            let mut added_exp_digit = false;
+            while let Some(&b) = bytes.get(cursor) {
+                if !b.is_ascii_digit() {
+                    break;
+                }
+                cursor+=1;
+                added_exp_digit = true;
+                exp_part_b.push(b);
+            }
+            if !added_exp_digit {
+                panic!("Malformed exponent");
+            }
+        }
+
+        if internally_int {
+            let value = i64::from_str_radix(str::from_utf8(&int_part_b).unwrap(), 16).unwrap();
+            let kind = TokenKind::NumericConstant(NumericConstant::Integer(value));
+            let span = &self.view[..cursor];
+            self.view = &self.view[cursor..];
+            
+            return Some(Token::new(kind, Span(span)));
+        }
+
+        let s = {
+            let mut s= String::from("0x");
+
+            if int_part_b.len() > 0 {
+                let int_part_s = str::from_utf8(&int_part_b).expect("Invalid utf8 in integer part");
+                s.push_str(int_part_s);
+            } else {
+                s.push('0');
+            }
+            s.push('.');
+            if frac_part_b.len() > 0 {
+                let frac_part_s = str::from_utf8(&frac_part_b).expect("Invalid utf8 in fractional part");
+                s.push_str(frac_part_s);
+            } else {
+                s.push('0');
+            }
+            s.push('p');
+            if exp_part_b.len() > 0 {
+                let exp_part_s = str::from_utf8(&exp_part_b).expect("Invalid utf8 in exponent part");
+                s.push_str(&exp_part_s);
+            } else {
+                s.push_str("0");
+            }
+
+            s
+        };
+        let value = hexf_parse::parse_hexf64(&s, false).unwrap();
+        let kind = TokenKind::NumericConstant(NumericConstant::Float(value));
+        let span = &self.view[..cursor];
+        self.view = &self.view[cursor..];
+        
+        return Some(Token::new(kind, Span(span)));
     }
 }
