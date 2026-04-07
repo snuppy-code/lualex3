@@ -560,31 +560,23 @@ impl<'i> Lexer<'i> {
         let mut significand = 0.;
         if int_part_b.len() > 0 {
             let int_part_s = String::from_utf8(int_part_b).expect("Invalid utf8 in integer part");
-            println!("int: {int_part_s}");
             let int_part = i64::from_str_radix(&int_part_s, 16).unwrap() as f64;
-            println!("int: {int_part}");
             significand+=int_part;
         }
         if frac_part_b.len() > 0 {
             let frac_part_s = String::from_utf8(frac_part_b).expect("Invalid utf8 in fractional part");
-            println!("frac: {frac_part_s}");
             let frac_part = {
                 let x = i64::from_str_radix(&frac_part_s, 16).unwrap();
                 (x as f64) / 16_f64.powi(frac_part_s.len() as i32)
             };
-            println!("frac: {frac_part}");
             significand+=frac_part;
         }
         let mut value = significand;
         if exp_part_b.len() > 0 {
             let exp_part_s = String::from_utf8(exp_part_b).expect("Invalid utf8 in exponent part");
-            println!("exp: {exp_part_s}\n");
             let exp_part = i32::from_str_radix(&exp_part_s, 10).unwrap();
-            println!("exp: {exp_part}");
-    
             value = significand*2_f64.powi(exp_part);
         }
-        println!("{value}");
         
         let kind = TokenKind::NumericConstant(NumericConstant::Float(value));
         let span = &self.view[..cursor];
