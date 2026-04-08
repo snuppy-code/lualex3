@@ -19,7 +19,7 @@ impl<'i> Lexer<'i> {
     pub fn get_view(&self) -> &'i str {
         &self.view
     }
-    pub fn iter_tokens(&'_ self) -> core::slice::Iter<'_,Token<'i>> {
+    pub fn iter_tokens(&self) -> core::slice::Iter<'_,Token<'i>> {
         self.tokens.iter()
     }
     pub fn iter_mut_tokens(&mut self) -> std::slice::IterMut<'_, Token<'i>> {
@@ -132,7 +132,7 @@ impl<'i> Lexer<'i> {
             return None;
         };
 
-        let mut last_q_pos = 1;
+        let mut last_q_pos = 0;
         let mut found_end = false;
         while let Some(new_q_pos) = bytes.iter().enumerate().position(|(i,&b)| b==quote && i>last_q_pos) {
             
