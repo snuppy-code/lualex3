@@ -1,8 +1,6 @@
 use std::{fs, hint::black_box};
 use criterion::{criterion_group, criterion_main, Criterion};
-use luide3::lexer_types::{self, Lexer};
-
-
+use luide3::lexer::Lexer;
 
 fn criterion_benchmark(c: &mut Criterion) {
     // let names = [

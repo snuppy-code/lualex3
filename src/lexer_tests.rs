@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::lexer_types::{Keyword, Lexer, LiteralString, NumericConstant, Span, Symbol, TokenKind};
+    use crate::{keyword::Keyword, lexer::Lexer, literalstring::LiteralString, numeric_constant::NumericConstant, symbol::Symbol, token::Span, token_kind::TokenKind};
 
     #[test]
     fn test_create() {
@@ -316,10 +316,10 @@ local function extreme_lexer_test(param1, ...)
 end
         "#;
         
-        use TokenKind::{Keyword as TKw, Symbol as TSym, Identifier as TId, NumericConstant as TNum, LiteralString as TStr};
-        use Keyword::*;
-        use Symbol::*;
-        use NumericConstant::*;
+        use crate::token_kind::TokenKind::{Keyword as TKw, Symbol as TSym, Identifier as TId, NumericConstant as TNum, LiteralString as TStr};
+        use crate::keyword::Keyword::*;
+        use crate::symbol::Symbol::*;
+        use crate::numeric_constant::NumericConstant::*;
 
         let expected = vec![
             TKw(Local), TKw(Function), TId, TSym(LParen), TId, TSym(Comma), TSym(DotDotDot), TSym(RParen),
