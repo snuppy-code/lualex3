@@ -3,6 +3,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use lualex3::lexer::Lexer;
 
 fn criterion_benchmark(c: &mut Criterion) {
+    
     let full_code = fs::read_dir("example_lua_code/").unwrap()
         .filter_map(|v| v.map(|e| e.path()).ok())
         .map(|p| std::fs::read_to_string(p).unwrap())
