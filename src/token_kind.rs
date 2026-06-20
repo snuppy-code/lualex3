@@ -1,4 +1,4 @@
-use crate::{keyword::Keyword, literalstring::LiteralString, numeric_constant::NumericConstant, symbol::Symbol};
+use crate::{keyword::Keyword, lexer_errors::LexerError, literalstring::LiteralString, numeric_constant::NumericConstant, symbol::Symbol};
 
 
 #[derive(Debug, PartialEq)]
@@ -8,6 +8,7 @@ pub enum TokenKind {
     LiteralString(LiteralString),
     NumericConstant(NumericConstant),
     Identifier,
+    Error(LexerError),
 }
 impl TokenKind {
     pub fn get_keyword(&self) -> Option<&Keyword> {

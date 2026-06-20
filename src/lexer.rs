@@ -1,4 +1,4 @@
-use crate::{keyword::{Keyword, lex_ident_or_kw}, literalstring::{LiteralString, lex_long_literal_string, lex_short_literal_string}, numeric_constant::{NumericConstant, lex_numeric_constant}, symbol::{Symbol, lex_symbol}, token::{Span, Token}, token_kind::TokenKind};
+use crate::{keyword::lex_ident_or_kw, lexer_errors::LexerError, literalstring::{lex_long_literal_string, lex_short_literal_string}, numeric_constant::lex_numeric_constant, symbol::lex_symbol, token::Token};
 
 #[derive(Debug)]
 pub struct Lexer<'i> {
@@ -31,26 +31,27 @@ impl<'i> Lexer<'i> {
     pub fn tokens_len(&self) -> usize {
         self.tokens.len()
     }
-    pub fn lex_to_end(&mut self) { 
-        'out: loop {
+    pub fn lex_to_end(&mut self) -> Result<(),Vec<LexerError>> { 
+        let mut lexing_errors = Vec::new();
+
+        loop {
             while self.skip_whitespace() || self.skip_comment() {};
 
-            let token = lex_ident_or_kw(self.view)
-                .or_else(|| lex_numeric_constant(self.view))
-                .or_else(|| lex_short_literal_string(self.view))
-                .or_else(|| lex_long_literal_string(self.view))
-                .or_else(|| lex_symbol(self.view))
-                ;
-
-            if let Some((token,new_view)) = token {
-                self.tokens.push(token);
-                self.view = new_view;
-            } else {
-                break 'out;
+            match lex_one(self.view) {
+                Ok(Some((token, new_view))) => {
+                    self.tokens.push(token);
+                    self.view = new_view;
+                },
+                Err(e) => lexing_errors.push(e),
+                Ok(None) => break,
             }
         }
         if self.view.len() > 0 {
-            panic!("failed lexing all, remains:\n-----\n{}\n----",self.view);
+            todo!();
+            // lexing_errors.push(LexerError::FailedLexingAll(self.view));
+            return Err(lexing_errors);
+        } else {
+            return Ok(());
         }
     }
     fn skip_whitespace(&mut self) -> bool {
@@ -110,4 +111,12 @@ impl<'i> Lexer<'i> {
 
         panic!("Unclosed long comment !");
     }
+}
+
+fn lex_one<'i>(view: &'i str) -> Result<Option<(Token<'i>, &'i str)>,LexerError<'i>> {
+    lex_ident_or_kw(view)
+        .or_else(|_| lex_numeric_constant(view))
+        .or_else(|_| lex_short_literal_string(view))
+        .or_else(|_| lex_long_literal_string(view))
+        .or_else(|_| lex_symbol(view))
 }
