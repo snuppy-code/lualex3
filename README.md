@@ -19,7 +19,7 @@ full eiss               time:   [173.24 µs 173.37 µs 173.50 µs]
 Found 1 outliers among 100 measurements (1.00%)
   1 (1.00%) high mild
 ```
-1835 lines of of real world lua code lexed in 1.7337e-4 or 0.00017337 seconds. I'm sure that's awfully slow for a lexer in a systems language but I'm happy with it !
+1835 lines of of my old but real lua code lexed in 1.7337e-4 or 0.00017337 seconds. I'm sure that's awfully slow for a lexer in a systems language but I'm happy with it !
 
 Notes to self:
 - cargo modules structure --lib
