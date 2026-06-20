@@ -1,11 +1,11 @@
-use crate::{token::{Span, Token}, token_kind::TokenKind};
+use crate::{lexer_errors::LexerError, token::{Span, Token}, token_kind::TokenKind};
 
 #[derive(Debug, PartialEq)]
 pub enum NumericConstant {
     Integer(i64),
     Float(f64),
 }
-pub fn lex_numeric_constant<'i>(view: &'i str) -> Option<(Token<'i>,&'i str)> {
+pub fn lex_numeric_constant<'i>(view: &'i str) -> Result<Option<(Token<'i>,&'i str)>,LexerError> {
     let bytes = view.as_bytes();
     
     if bytes.starts_with(b"0x") || bytes.starts_with(b"0X") { 
@@ -16,11 +16,11 @@ pub fn lex_numeric_constant<'i>(view: &'i str) -> Option<(Token<'i>,&'i str)> {
         [b'0'..=b'9', ..] | [b'.', b'0'..=b'9', ..] => {
             return lex_decimal_numeric_constant(view);
         },
-        _ => return None,
+        _ => return Ok(None),
     };
 }
 
-pub fn lex_decimal_numeric_constant<'i>(view: &'i str) -> Option<(Token<'i>,&'i str)> {
+pub fn lex_decimal_numeric_constant<'i>(view: &'i str) -> Result<Option<(Token<'i>,&'i str)>,LexerError> {
     let bytes = view.as_bytes();
     let mut cursor = 0;
 
@@ -51,7 +51,7 @@ pub fn lex_decimal_numeric_constant<'i>(view: &'i str) -> Option<(Token<'i>,&'i 
     }
 
     if int_part_bs.len() == 0 && frac_part_bs.len() == 0 {
-        panic!("decimal numeric constant needs at least an integer or fractional part !");
+        return Err(LexerError::DecimalNumericConstantNeedsIntOrFracPart)
     }
     if let [b'e'|b'E', ..] = &bytes[cursor..] {
         cursor+=1;
@@ -59,12 +59,17 @@ pub fn lex_decimal_numeric_constant<'i>(view: &'i str) -> Option<(Token<'i>,&'i 
             cursor+=1;
             exp_part_bs.push(sign);
         }
+        let mut added_exp_digit = false;
         while let Some(&b) = bytes.get(cursor) {
             cursor+=1;
             if !b.is_ascii_digit() {
                 break;
             }
+            added_exp_digit = true;
             exp_part_bs.push(b);
+        }
+        if !added_exp_digit {
+            return Err(LexerError::DecimalNumericConstantMalformedExponent);
         }
     }
 
@@ -75,7 +80,7 @@ pub fn lex_decimal_numeric_constant<'i>(view: &'i str) -> Option<(Token<'i>,&'i 
         let span = &view[..cursor];
         let new_view = &view[cursor..];
         
-        return Some((Token::new(kind, Span(span)),new_view));
+        return Ok(Some((Token::new(kind, Span(span)),new_view)));
     }
 
     let s = {
@@ -107,7 +112,7 @@ pub fn lex_decimal_numeric_constant<'i>(view: &'i str) -> Option<(Token<'i>,&'i 
     let span = &view[..cursor];
     let new_view = &view[cursor..];
     
-    return Some((Token::new(kind, Span(span)),new_view));
+    return Ok(Some((Token::new(kind, Span(span)),new_view)));
 }
 /*  Hexadecimal constants:
         MUST have an integer or fractional part.
@@ -128,7 +133,7 @@ pub fn lex_decimal_numeric_constant<'i>(view: &'i str) -> Option<(Token<'i>,&'i 
     0x.p0
     0x.0p
     0x0.0p*/
-pub fn lex_hexadecimal_numeric_constant<'i>(view: &'i str) -> Option<(Token<'i>,&'i str)> {
+pub fn lex_hexadecimal_numeric_constant<'i>(view: &'i str) -> Result<Option<(Token<'i>,&'i str)>,LexerError> {
     let bytes = view.as_bytes();
     let mut cursor = 0;
 
@@ -160,7 +165,7 @@ pub fn lex_hexadecimal_numeric_constant<'i>(view: &'i str) -> Option<(Token<'i>,
     }
 
     if int_part_b.len() == 0 && frac_part_b.len() == 0 {
-        panic!("hex constant needs integer part or fractional part!");
+        return Err(LexerError::HexNumericConstantNeedsIntOrFracPart)
     }
 
     if let Some(&(b'p'|b'P')) = bytes.get(cursor) {
@@ -182,7 +187,7 @@ pub fn lex_hexadecimal_numeric_constant<'i>(view: &'i str) -> Option<(Token<'i>,
             exp_part_b.push(b);
         }
         if !added_exp_digit {
-            panic!("Malformed exponent");
+            return Err(LexerError::HexNumericConstantMalformedExponent);
         }
     }
 
@@ -192,7 +197,7 @@ pub fn lex_hexadecimal_numeric_constant<'i>(view: &'i str) -> Option<(Token<'i>,
         let span = &view[..cursor];
         let new_view = &view[cursor..];
         
-        return Some((Token::new(kind, Span(span)),new_view));
+        return Ok(Some((Token::new(kind, Span(span)),new_view)));
     }
 
     let s = {
@@ -226,5 +231,5 @@ pub fn lex_hexadecimal_numeric_constant<'i>(view: &'i str) -> Option<(Token<'i>,
     let span = &view[..cursor];
     let new_view = &view[cursor..];
     
-    return Some((Token::new(kind, Span(span)),new_view));
+    return Ok(Some((Token::new(kind, Span(span)),new_view)));
 }

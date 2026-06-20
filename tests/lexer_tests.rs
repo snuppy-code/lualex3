@@ -254,8 +254,8 @@ mod tests {
             TKw(Local), TId, TSym(Equals), TNum(Integer(3735928559)),
             TKw(Local), TId, TSym(Equals), TNum(Float(3.141592653589793)),
 
-            TKw(Local), TId, TSym(Equals), TStr(LiteralString::from_escape_short("")),
-            TKw(Local), TId, TSym(Equals), TStr(LiteralString::from_escape_short("")),
+            TKw(Local), TId, TSym(Equals), TStr(LiteralString::from_escape_short("").unwrap()),
+            TKw(Local), TId, TSym(Equals), TStr(LiteralString::from_escape_short("").unwrap()),
 
             // escapes: \a (0x07), \b (0x08), \f (0x0C), \v (0x0B). \\ is just \, \" is just "
             TKw(Local), TId, TSym(Equals), TStr(LiteralString::from_already_escaped("Basic escapes: bell\x07, backspace\x08, formfeed\x0C, newline\n, return\r, tab\t, vtab\x0B, slash\\\\, d-quote\"")),
@@ -272,7 +272,7 @@ mod tests {
             TKw(Local), TId, TSym(Equals), TKw(Nil),
 
             TKw(Local), TId, TSym(Equals), TSym(LCurly),
-            TSym(LBracket), TStr(LiteralString::from_escape_short("key_string")), TSym(RBracket), TSym(Equals), TId, TSym(DotDot), TId, TSym(Comma),
+            TSym(LBracket), TStr(LiteralString::from_escape_short("key_string").unwrap()), TSym(RBracket), TSym(Equals), TId, TSym(DotDot), TId, TSym(Comma),
             TSym(Equals), TSym(LCurly), TSym(DotDotDot), TSym(RCurly), TSym(Comma),
             TId, TSym(Equals), TId, TSym(Plus), TId, TSym(Star), TNum(Integer(2)), TSym(Slash), TNum(Integer(1)),
             TSym(RCurly),

@@ -6,7 +6,7 @@ impl LiteralString {
     pub fn from_already_escaped(s: &str) -> Self {
         LiteralString(String::from(s))
     }
-    pub fn from_escape_short(s: &str) -> Result<Self,LexerError> {
+    pub fn from_escape_short<'i>(s: &'i str) -> Result<Self,LexerError> {
         let mut res = Vec::with_capacity(s.len());
         let mut bytes = s.bytes().peekable();
 
@@ -37,12 +37,18 @@ impl LiteralString {
                 },
 
                 b'x' => {
-                    let d1 = bytes.next().expect("Unfinished \\x escape sequence at end of string!");
-                    let d2 = bytes.next().expect("Unfinished \\x escape sequence at end of string!");
+                    let Some(d1) = bytes.next() else {
+                        return Err(LexerError::InvalidStringxEscapeUnfinished);
+                    };
+                    let Some(d2) = bytes.next() else {
+                        return Err(LexerError::InvalidStringxEscapeUnfinished);
+                    };
 
                     let digits = [d1,d2];
-                    let tmp_s = str::from_utf8(&digits).expect("Invalid utf8? in \\x escape sequence");
-                    let v = u8::from_str_radix(tmp_s, 16).expect("Invalid hex, maybe too large? in \\x escape sequence!");
+                    let tmp_s = str::from_utf8(&digits).unwrap();
+                    let Ok(v) = u8::from_str_radix(tmp_s, 16) else {
+                        return Err(LexerError::InvalidStringxEscapeInvalidPossiblyTooLarge);
+                    };
 
                     res.push(v);
                 },
@@ -63,7 +69,7 @@ impl LiteralString {
                             break;
                         }
                         if !c.is_ascii_hexdigit() {
-                            return Err(LexerError::InvalidStringuEscapeInvalidChar);
+                            return Err(LexerError::InvalidStringuEscapeInvalidChar(c));
                         }
                         let d = (c as char).to_digit(16).unwrap();
                         usv_hex = (usv_hex << 4) | d;
@@ -112,7 +118,7 @@ impl LiteralString {
 
         Ok(LiteralString(String::from_utf8(res).unwrap()))
     }
-    pub fn from_escape_long(s: &str) -> Result<Self,LexerError> {
+    pub fn from_escape_long<'i>(s: &'i str) -> Result<Self,LexerError> {
         let mut res = Vec::with_capacity(s.len());
         let bytes = s.as_bytes();
         let mut cursor = 0;
@@ -146,6 +152,7 @@ impl LiteralString {
     }
 }
 
+
 pub fn lex_short_literal_string<'i>(view: &'i str) -> Result<Option<(Token<'i>,&'i str)>,LexerError> {
     let bytes = view.as_bytes();
     
@@ -171,7 +178,7 @@ pub fn lex_short_literal_string<'i>(view: &'i str) -> Result<Option<(Token<'i>,&
         }
     }
     if !found_end {
-        return Err(LexerError::Inv);
+        return Err(LexerError::UnclosedShortString);
     }
     
     let contents = str::from_utf8(&bytes[1..last_q_pos]).unwrap();
@@ -230,5 +237,6 @@ pub fn lex_long_literal_string<'i>(view: &'i str) -> Result<Option<(Token<'i>,&'
             )))
         };
     }
-    return Ok(None); // should I maybe panic here instead?
+    return Err(LexerError::UnclosedLongString)
+    // return Ok(None); // should I maybe panic here instead?
 }
