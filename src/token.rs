@@ -1,7 +1,15 @@
+use std::fmt::Display;
+
 use crate::token_kind::TokenKind;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Span<'i>(pub &'i str);
+
+impl<'i> Display for Span<'i> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub struct Token<'i> {

@@ -1,17 +1,49 @@
-use crate::{lexer_errors::LexerError, token::{Span, Token}, token_kind::TokenKind};
+use crate::{
+    lexer_errors::LexerErrorKind,
+    token::{Span, Token},
+    token_kind::TokenKind,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Symbol {
-//  +               -           *               /                   %           ^               #
-//  &               ~           |               <<                  >>          //
-//  ==              ~=          <=              >=                  <           >               =
-//  (               )           {               }                   [           ]               ::
-//  ;               :           ,               .                   ..          ...
-    Plus,           Dash,       Star,           Slash,              Percent,    Caret,          Hashtag,
-    Ampersand,      Tilde,      Pipe,           LShift,             RShift,     SlashSlash,
-    EqualsEquals,   NotEquals,  LessOrEquals,   GreaterOrEquals,    LessThan,   GreaterThan,    Equals,
-    LParen,         RParen,     LCurly,         RCurly,             LBracket,   RBracket,       ColonColon,
-    Semicolon,      Colon,      Comma,          Dot,                DotDot,     DotDotDot,
+    //  +               -           *               /                   %           ^               #
+    //  &               ~           |               <<                  >>          //
+    //  ==              ~=          <=              >=                  <           >               =
+    //  (               )           {               }                   [           ]               ::
+    //  ;               :           ,               .                   ..          ...
+    Plus,
+    Dash,
+    Star,
+    Slash,
+    Percent,
+    Caret,
+    Hashtag,
+    Ampersand,
+    Tilde,
+    Pipe,
+    LShift,
+    RShift,
+    SlashSlash,
+    EqualsEquals,
+    NotEquals,
+    LessOrEquals,
+    GreaterOrEquals,
+    LessThan,
+    GreaterThan,
+    Equals,
+    LParen,
+    RParen,
+    LCurly,
+    RCurly,
+    LBracket,
+    RBracket,
+    ColonColon,
+    Semicolon,
+    Colon,
+    Comma,
+    Dot,
+    DotDot,
+    DotDotDot,
 }
 impl Symbol {
     pub fn to_str(sym: Symbol) -> &'static str {
@@ -91,19 +123,19 @@ impl Symbol {
     }
 }
 
-pub fn lex_symbol<'i>(view: &'i str) -> Result<Option<(Token<'i>,&'i str)>,LexerError> {
-    let (sym,sym_len) = match view.as_bytes() {
-        [b'.', b'.', b'.', ..] => (Symbol::DotDotDot,3),
+pub fn lex_symbol<'i>(view: &'i str) -> Result<Option<(Token<'i>, &'i str)>, LexerErrorKind> {
+    let (sym, sym_len) = match view.as_bytes() {
+        [b'.', b'.', b'.', ..] => (Symbol::DotDotDot, 3),
 
-        [b'<', b'<', ..] => (Symbol::LShift,2),
-        [b'>', b'>', ..] => (Symbol::RShift,2),
-        [b'/', b'/', ..] => (Symbol::SlashSlash,2),
-        [b'=', b'=', ..] => (Symbol::EqualsEquals,2),
-        [b'~', b'=', ..] => (Symbol::NotEquals,2),
-        [b'<', b'=', ..] => (Symbol::LessOrEquals,2),
-        [b'>', b'=', ..] => (Symbol::GreaterOrEquals,2),
-        [b':', b':', ..] => (Symbol::ColonColon,2),
-        [b'.', b'.', ..] => (Symbol::DotDot,2),
+        [b'<', b'<', ..] => (Symbol::LShift, 2),
+        [b'>', b'>', ..] => (Symbol::RShift, 2),
+        [b'/', b'/', ..] => (Symbol::SlashSlash, 2),
+        [b'=', b'=', ..] => (Symbol::EqualsEquals, 2),
+        [b'~', b'=', ..] => (Symbol::NotEquals, 2),
+        [b'<', b'=', ..] => (Symbol::LessOrEquals, 2),
+        [b'>', b'=', ..] => (Symbol::GreaterOrEquals, 2),
+        [b':', b':', ..] => (Symbol::ColonColon, 2),
+        [b'.', b'.', ..] => (Symbol::DotDot, 2),
 
         [b'+', ..] => (Symbol::Plus, 1),
         [b'-', ..] => (Symbol::Dash, 1),
@@ -135,5 +167,8 @@ pub fn lex_symbol<'i>(view: &'i str) -> Result<Option<(Token<'i>,&'i str)>,Lexer
     let sym_str = &view[..sym_len];
     let new_view = &view[sym_len..];
 
-    Ok(Some((Token::new(TokenKind::Symbol(sym), Span(sym_str)),new_view)))
+    Ok(Some((
+        Token::new(TokenKind::Symbol(sym), Span(sym_str)),
+        new_view,
+    )))
 }

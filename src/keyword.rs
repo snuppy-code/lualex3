@@ -1,25 +1,50 @@
-use crate::{lexer_errors::LexerError, token::{Span, Token}, token_kind::TokenKind};
+use crate::{
+    lexer_errors::LexerErrorKind,
+    token::{Span, Token},
+    token_kind::TokenKind,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Keyword {
-    And,       Break,     Do,        Else,      Elseif,    End,
-    False,     For,       Function,  Goto,      If,        In,
-    Local,     Nil,       Not,       Or,        Repeat,    Return,
-    Then,      True,      Until,     While,
+    And,
+    Break,
+    Do,
+    Else,
+    Elseif,
+    End,
+    False,
+    For,
+    Function,
+    Goto,
+    If,
+    In,
+    Local,
+    Nil,
+    Not,
+    Or,
+    Repeat,
+    Return,
+    Then,
+    True,
+    Until,
+    While,
 }
 
-pub fn lex_ident_or_kw<'i>(view: &'i str) -> Result<Option<(Token<'i>,&'i str)>,LexerError> {
+pub fn lex_iden_or_kw<'i>(view: &'i str) -> Result<Option<(Token<'i>, &'i str)>, LexerErrorKind> {
     let bytes = view.as_bytes();
 
-    let Some(&b) = bytes.first() else { return Ok(None); };
+    let Some(&b) = bytes.first() else {
+        return Ok(None);
+    };
     if !(b.is_ascii_alphabetic() || b == b'_') {
         return Ok(None);
     }
 
-    let n = bytes.iter()
+    let n = bytes
+        .iter()
         .take_while(|&&b| b.is_ascii_alphanumeric() || b == b'_')
         .count();
-    
+
     let something_str = &view[..n];
     let new_view = &view[n..];
 
@@ -49,5 +74,18 @@ pub fn lex_ident_or_kw<'i>(view: &'i str) -> Result<Option<(Token<'i>,&'i str)>,
         _ => TokenKind::Identifier,
     };
 
-    Ok(Some((Token::new(kind, Span(something_str)),new_view)))
+    Ok(Some((Token::new(kind, Span(something_str)), new_view)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::lex_iden_or_kw;
+
+    fn test_lex_iden_or_kw() {
+        let kws = ["function", "elseif", "else", "in"];
+        let idens = ["aand", "andd", "a3", "_99", "bingus"];
+        for kw in kws {
+            lex_iden_or_kw(kw)
+        }
+    }
 }
