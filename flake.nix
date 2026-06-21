@@ -15,12 +15,12 @@
     pkgs = nixpkgs.legacyPackages."${my}";
   in {
     devShells."${my}".default = pkgs.mkShell {
-      buildInputs = with pkgs; [
+      strictDeps = true;
+      nativeBuildInputs = with pkgs; [
         cargo
         rustc
         rustfmt
         clippy
-        # rust-analyzer # doesn't seem necessary?
       ];
       env.RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
     };
